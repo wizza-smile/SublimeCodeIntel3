@@ -1424,8 +1424,18 @@ class PythonCodeIntel(sublime_plugin.EventListener):
                     _completions = format_completions_by_language(cplns, lang, text_in_current_line, trigger)
 
                 if add_word_completions in ["buffer", "all"]:
-                    wordsFromBuffer = WordCompletionsFromBuffer()
-                    word_completions_from_buffer = wordsFromBuffer.getCompletions(view, prefix, locations, add_word_completions)
+                    wordsFromBufferMgr = WordCompletionsFromBuffer()
+                    word_completions_from_buffer = wordsFromBufferMgr.getCompletions(view, prefix, locations, add_word_completions)
+                    if cplns is not None:
+                        #remove buffer completions that are already in codeintel completions
+                        def extendForLanguages(n, lang):
+                            for i in n:
+                                yield i[1]
+                                if lang == "PHP":
+                                    yield "$"+i[1]
+                        cplns_list = [i for i in extendForLanguages(cplns, lang)]
+                        word_completions_from_buffer = [x for x in word_completions_from_buffer if x[0] not in cplns_list]
+
                     _completions = list(_completions + word_completions_from_buffer)
 
         #is the sorting actually doing anything??
