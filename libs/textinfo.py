@@ -1490,6 +1490,8 @@ def _norm_encoding(encoding):
     """
     try:
         # This requires Python >=2.5.
+        if isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
         return codecs.lookup(encoding).name
     except LookupError:
         return encoding
