@@ -1147,14 +1147,12 @@ class SettingsManager():
         'codeintel',
         'codeintel_database_dir',
         'codeintel_enabled_languages',
-        #'codeintel_live_enabled_languages',
-        'codeintel_syntax_map',
-        #'sublime_auto_complete'
+        'codeintel_syntax_map'
     ]
 
     #these settings can be overriden "per language"
     OVERRIDE_SETTINGS = [
-        'codeintel_word_completions',
+        'codeintel_exclude_scopes_from_complete_triggers',
         'codeintel_language_settings',
         'codeintel_live',
         'codeintel_max_recursive_dir_depth',
@@ -1162,7 +1160,8 @@ class SettingsManager():
         'codeintel_scan_files_in_project',
         'codeintel_selected_catalogs',
         'codeintel_snippets',
-        'codeintel_tooltips'
+        'codeintel_tooltips',
+        'codeintel_word_completions'
     ]
 
     def __init__(self):
@@ -1332,19 +1331,17 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         if not view_sel:
             return
 
-        settings_manager.update()
-
-        exclude_scopes = [
-            #"comment"
-        ]
-
         sublime_scope = getSublimeScope(view)
-        for exclude_scope in exclude_scopes:
-            if exclude_scope in sublime_scope:
-                return
 
         path = view.file_name()
         lang = guess_lang(view, path, sublime_scope)
+
+        settings_manager.update()
+        exclude_scopes = settings_manager.get("codeintel_exclude_scopes_from_complete_triggers", language=lang, default=[])
+
+        for exclude_scope in exclude_scopes:
+            if exclude_scope in sublime_scope:
+                return
 
         if not settings_manager.get('codeintel_live', default=True, language=lang):
             #restore the original sublime auto_complete settings from Preferences.sublime-settings file in User package
