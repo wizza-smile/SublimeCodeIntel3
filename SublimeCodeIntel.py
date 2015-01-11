@@ -1302,6 +1302,23 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         settings_manager.update()
         #print(settings_manager.get("codeintel_database_dir"))
 
+    #rescan a buffer on_pre_save, if it is dirty
+    def on_pre_save(self, view):
+        if view.is_dirty():
+            try:
+                env = _ci_envs_[view.id()]
+            except KeyError:
+                return
+
+            lang = guess_lang(view)
+            path = view.file_name()
+            mtime = os.stat(path)[stat.ST_MTIME]
+
+            content = view.substr(sublime.Region(0, view.size()))
+            mgr = codeintel_manager()
+            buf = mgr.buf_from_content(content, lang, env, path or "<Unsaved>", 'utf-8')
+            buf.scan(mtime=mtime, skip_scan_time_check=True)
+
     def on_close(self, view):
         vid = view.id()
         if vid in completions:
