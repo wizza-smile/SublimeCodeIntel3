@@ -1277,8 +1277,9 @@ settings_manager = SettingsManager()
 def codeintel_enabled(view, default=None):
     if view.settings().get('codeintel') is None:
         ##updates settings if necessary
-        settings_manager.getSettings()
-    return view.settings().get('codeintel', default)
+        if settings_manager.getSettings():
+            return True
+    return settings_manager.get('codeintel', default=default)
 
 
 def format_completions_by_language(cplns, language, text_in_current_line, trigger):
