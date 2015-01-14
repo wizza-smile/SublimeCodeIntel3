@@ -193,10 +193,9 @@ def tooltip_popup(view, snippets):
 
     sublime.set_timeout(open_auto_complete, 0)
 
-def tooltip(view, calltips, original_pos):
-    view_settings = view.settings()
-    codeintel_snippets = view_settings.get('codeintel_snippets', True)
-    codeintel_tooltips = view_settings.get('codeintel_tooltips', 'popup')
+def tooltip(view, calltips, original_pos, lang):
+    codeintel_snippets = settings_manager.get('codeintel_snippets', default=True, language=lang)
+    codeintel_tooltips = settings_manager.get('codeintel_tooltips', default='popup', language=lang)
 
     snippets = []
     for calltip in calltips:
@@ -455,7 +454,7 @@ def autocomplete(view, timeout, busy_timeout, forms, preemptive=False, args=[], 
                 if calltips and caller != "on_modified":
                     if trigger:
                         print("current triggername: %r" % trigger.name)
-                    tooltip(view, calltips, original_pos)
+                    tooltip(view, calltips, original_pos, lang)
                     return
 
                 #under certain circumstances we have to close before reopening the currently open completions-panel
