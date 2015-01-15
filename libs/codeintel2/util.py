@@ -434,9 +434,11 @@ def markup_text(text, pos=None, trg_pos=None, start_pos=None):
     positions_and_markers.sort()
 
     text = str(text).encode("utf-8")
-    m_text = ""
+    m_text = b""
     m_pos = 0
     for position, marker in positions_and_markers:
+        if isinstance(marker, str):
+            marker = marker.encode("utf-8")
         m_text += text[m_pos:position] + marker
         m_pos = position
     m_text += text[m_pos:]
