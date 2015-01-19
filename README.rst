@@ -2,6 +2,7 @@ SublimeCodeIntel3
 =================
 
 This fork is mainly meant to be a refinement of the wonderful `SublimeCodeIntel <https://github.com/SublimeCodeIntel/SublimeCodeIntel>`_ plugin.
+This is for Sublime Text 3 only.
 It was developed with a focus on PHP, Python and JavaScript. Bug reports (for all languages), PR and general feedback are welcome!
 If you're coming from the original SublimeCodeIntel, take a close look at the ``Configuring`` and ``What's New`` sections below!
 
@@ -161,6 +162,10 @@ To force re-indexation of the code intelligence database you need to follow thes
 
 What's New
 ----------
+v3.0.2:
+
++ PHP completions within function brackets
+
 v3.0.1:
 
 + only working with ST3
