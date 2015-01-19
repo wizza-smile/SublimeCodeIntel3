@@ -539,7 +539,7 @@ def autocomplete(view, timeout, busy_timeout, forms, preemptive=False, args=[], 
 
 
             content = view.substr(sublime.Region(0, view.size()))
-            codeintel(view, path, content, lang, pos, forms, _trigger)
+            codeintel(view, path, content, lang, pos, forms, _trigger, caller=caller)
     # If it's a fill char, queue using lower values and preemptive behavior
     queue(view, _autocomplete_callback, timeout, busy_timeout, preemptive, args=args, kwargs=kwargs)
 
@@ -751,7 +751,7 @@ def codeintel_manager(manager_id=None):
     return mgr
 
 
-def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=None):
+def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=None, caller=None):
     global despair
     for thread in threading.enumerate():
         if thread.isAlive() and thread.name == "scanning thread":
@@ -869,6 +869,8 @@ def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=Non
 
             ##CREATE THE BUFFER##
             buf = mgr.buf_from_content(content, lang, env, path or "<Unsaved>", 'utf-8')
+            buf.caller = caller
+            buf.orig_pos = pos
             #####################
 
             if mgr.is_citadel_lang(lang):
@@ -901,7 +903,7 @@ def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=Non
     threading.Thread(target=_codeintel_scan, name="scanning thread").start()
 
 
-def codeintel(view, path, content, lang, pos, forms, callback=None, timeout=7000):
+def codeintel(view, path, content, lang, pos, forms, callback=None, timeout=7000, caller=None):
     start = time.time()
 
     def _codeintel(buf, msgs):
@@ -1000,7 +1002,7 @@ def codeintel(view, path, content, lang, pos, forms, callback=None, timeout=7000
             msg = "Just finished indexing '%s'! Please try again. Full CodeIntel took %s" % (lang, timestr)
             print(msg, file=condeintel_log_file)
             logger(view, 'info', msg, timeout=3000)
-    codeintel_scan(view, path, content, lang, _codeintel, pos, forms)
+    codeintel_scan(view, path, content, lang, _codeintel, pos, forms, caller=caller)
 
 
 
@@ -1417,7 +1419,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
             else:
                 forms = ('calltips', 'cplns')
             ##will queue an autocomplete job
-            autocomplete(view, 0 if is_fill_char else 200, 50 if is_fill_char else 600, forms, is_fill_char, args=[path, pos, lang, "on_modified"])
+            autocomplete(view, 0 if is_fill_char else 200, 50 if is_fill_char else 600, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":"on_modified"})
         else:
             view.run_command('hide_auto_complete')
 
