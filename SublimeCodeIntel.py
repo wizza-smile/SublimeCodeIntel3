@@ -1183,8 +1183,9 @@ class SettingsManager():
         self.needs_update = True
         self.ALL_SETTINGS = list(self.CORE_SETTINGS + self.OVERRIDE_SETTINGS)
         self.user_settings_file = None
-        sublime_settings_file = sublime.load_settings('Preferences.sublime-settings')
-        self.sublime_auto_complete = sublime_settings_file.get('auto_complete')
+        self.sublime_settings_file = sublime.load_settings('Preferences.sublime-settings')
+        self.sublime_auto_complete = None
+
         #sublime.message_dialog(str(self.sublime_auto_complete))
 
     def get(self, config_key, default=None, language=None):
@@ -1238,6 +1239,9 @@ class SettingsManager():
         return self.needs_update
 
     def update(self):
+        if self.sublime_auto_complete is None and self.sublime_settings_file.get('auto_complete') is not None:
+            self.sublime_auto_complete = self.sublime_settings_file.get('auto_complete')
+
         if self.user_settings_file is None:
             self.user_settings_file = sublime.load_settings(self.SETTINGS_FILE_NAME + '.sublime-settings')
             #the file might not be loaded yet
@@ -1340,7 +1344,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
 
     def on_modified(self, view):
         view_sel = view.sel()
-        if not view_sel:
+        if not view_sel or settings_manager.sublime_auto_complete is None:
             return
 
         sublime_scope = getSublimeScope(view)
@@ -1355,20 +1359,18 @@ class PythonCodeIntel(sublime_plugin.EventListener):
             if exclude_scope in sublime_scope:
                 return
 
-        if not settings_manager.get('codeintel_live', default=True, language=lang):
+        if not lang or lang.lower() not in [l.lower() for l in settings_manager.get('codeintel_enabled_languages', [])]:
             #restore the original sublime auto_complete settings from Preferences.sublime-settings file in User package
             #this is for files with mixed languages (HTML/PHP)
             view.settings().set('auto_complete', settings_manager.sublime_auto_complete)
-            #if live completion is disabled, we're wrong here!
             return
 
-        if not lang or lang.lower() not in [l.lower() for l in settings_manager.get('codeintel_enabled_languages', [])]:
+        if not settings_manager.get('codeintel_live', default=True, language=lang):
+            #if live completion is disabled, we're wrong here!
             return
 
         ##disable sublime's auto_complete for now / this is for files with mixed languages (HTML/PHP)
         view.settings().set('auto_complete', False)
-
-
 
 
         sel = view_sel[0]
@@ -1426,6 +1428,11 @@ class PythonCodeIntel(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         vid = view.id()
+
+        lang = guess_lang(view)
+        if not lang or lang.lower() not in [l.lower() for l in settings_manager.get('codeintel_enabled_languages', [])]:
+            #lang is not ci enabled. Dont mess with the default completions!
+            return []
 
         ##add sublime completions to the mix / not recomended
         sublime_word_completions = False
