@@ -411,7 +411,7 @@ def guess_lang(view=None, path=None, sublime_scope=None):
 
     #folders = getattr(view.window(), 'folders', lambda: [])()  # FIXME: it's like this for backward compatibility (<= 2060)
     #folders_id = str(hash(frozenset(folders)))
-    mgr = None if settings_manager.settings_id is None else codeintel_manager()
+    mgr = None if settings_manager._settings_id is None else codeintel_manager()
 
     if mgr and not mgr.is_citadel_lang(lang) and not mgr.is_cpln_lang(lang):
         lang = None
@@ -721,7 +721,7 @@ def codeintel_manager(manager_id=None):
         return mgr
 
 
-    manager_id = settings_manager.settings_id
+    manager_id = settings_manager._settings_id
     mgr = _ci_mgr_.get(manager_id, None)
 
 
@@ -783,7 +783,7 @@ def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=Non
             if env._lang != lang:
                 ##if the language changes within one view (HTML/PHP) we need to update our Environment Object on each change!
                 raise KeyError
-            if env._mtime != settings_manager.settings_id:
+            if env._mtime != settings_manager._settings_id:
                 raise KeyError
         except KeyError:
             #generate new Environment
@@ -843,7 +843,7 @@ def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=Non
 
             env = SimplePrefsEnvironment(**config)
             env._valid = valid
-            env._mtime = settings_manager.settings_id
+            env._mtime = settings_manager._settings_id
             env._lang = lang
             env._folders = folders
             _ci_envs_[vid] = env
