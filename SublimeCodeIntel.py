@@ -1076,6 +1076,22 @@ def get_revision(path=None):
             break
     return u'GIT-unknown'
 
+def triggerWordCompletions(view, lang, codeintel_word_completions):
+    #fast triggering
+    vid = view.id()
+
+    on_query_info = {}
+    on_query_info["params"] = ("cplns", codeintel_word_completions, "", None, None)
+    on_query_info["cplns"] = None
+
+    completions[vid] = on_query_info
+
+    view.run_command('auto_complete', {
+        'disable_auto_insert': True,
+        'api_completions_only': True,
+        'next_completion_if_showing': False,
+        'auto_complete_commit_on_tab': True,
+    })
 
 
 #thanks to https://github.com/alienhard
@@ -1308,6 +1324,7 @@ settings_manager = SettingsManager()
 
 
 def codeintel_enabled(view, default=None):
+    return True
     if view.settings().get('codeintel') is None:
         ##updates settings if necessary
         if settings_manager.getSettings():
@@ -1402,6 +1419,11 @@ class PythonCodeIntel(sublime_plugin.EventListener):
             #sublime.message_dialog("LAST CHAR IS EMPTY")
             view.run_command('hide_auto_complete')
             return
+
+        #fast trigger word completions from buffer
+        codeintel_word_completions = settings_manager.get("codeintel_word_completions", language=lang)
+        if codeintel_word_completions in ["buffer", "all"]:
+            triggerWordCompletions(view, lang, codeintel_word_completions)
 
         is_fill_char = (text and text[-1] in cpln_fillup_chars.get(lang, ''))
 
