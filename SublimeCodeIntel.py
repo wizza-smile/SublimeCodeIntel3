@@ -1077,6 +1077,7 @@ def get_revision(path=None):
     return u'GIT-unknown'
 
 def triggerWordCompletions(view, lang, codeintel_word_completions):
+    global last_trigger_name, last_citdl_expr
     #fast triggering
     vid = view.id()
 
@@ -1085,6 +1086,8 @@ def triggerWordCompletions(view, lang, codeintel_word_completions):
     on_query_info["cplns"] = None
 
     completions[vid] = on_query_info
+    last_citdl_expr = None
+    last_trigger_name = None
 
     view.run_command('auto_complete', {
         'disable_auto_insert': True,
