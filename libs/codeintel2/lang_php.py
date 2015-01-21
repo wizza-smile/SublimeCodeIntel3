@@ -402,19 +402,14 @@ class PHPLangIntel(CitadelLangIntel, ParenStyleCalltipIntelMixin,
                         # XXX - Check the php version, magic methods only
                         #       appeared in php 5.
                         #
-                        print("magic-METHODS null")
                         p, ch, style = ac.getPrevPosCharStyle(ignore_styles=self.comment_styles)
-                        cheggor = ac.getTextBackWithStyle(self.keyword_style, max_text_len=9)[1]
-                        print("%s" % (cheggor))
-                        #print("%s" % (ac.getTextBackWithStyle(self.keyword_style, max_text_len=9)[1]))
-                        if cheggor.strip() == "function":
-                            print("magic-METHODS")
+                        last_keyword = ac.getTextBackWithStyle(self.keyword_style, max_text_len=9)[1].strip()
+                        if last_keyword == "function":
                             if DEBUG:
                                 print("triggered:: complete magic-methods")
                             return Trigger(
                                 lang, TRG_FORM_CPLN, "magic-methods",
                                 prev_pos, implicit)
-
 
                     elif style == last_style:
                         p, ch, style = ac.getPrevPosCharStyle(
