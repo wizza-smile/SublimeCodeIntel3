@@ -1218,11 +1218,8 @@ class SettingsManager():
         self.sublime_auto_complete = None
 
     def loadSublimeSettings(self):
-        window = sublime.active_window()
-        view = window.active_view()
-        if view:
-            self.sublime_settings_file = sublime.load_settings('Preferences.sublime-settings')
-            self.sublime_auto_complete = self.sublime_settings_file.get('auto_complete')
+        self.sublime_settings_file = sublime.load_settings('Preferences.sublime-settings')
+        self.sublime_auto_complete = self.sublime_settings_file.get('auto_complete')
 
     def get(self, config_key, default=None, language=None):
         if language is not None:
@@ -1276,6 +1273,12 @@ class SettingsManager():
 
     def update(self):
         if self.sublime_auto_complete is None:
+            window = sublime.active_window()
+            if not window:
+                return
+            view = window.active_view()
+            if not view:
+                return
             self.loadSublimeSettings()
 
         if self.user_settings_file is None:
