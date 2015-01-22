@@ -1422,7 +1422,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         #no autocomplete if last char is empty string
         #hide completions if visible
         #this totally necessary, if you like to use your tab-key extensively
-        if not text.strip():
+        if text and text in cpln_stop_chars[lang]:
             #hey k, clean up later, issues are coming from ST2 mostly!
             view.run_command('hide_auto_complete')
             return
