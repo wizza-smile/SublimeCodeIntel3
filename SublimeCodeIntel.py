@@ -230,6 +230,7 @@ def tooltip(view, calltips, text_in_current_line, original_pos, lang):
         if m:
             params = [p.strip() for p in m.group(2).split(',')]
             if params:
+                n = 1
                 snippet = []
                 for i, p in enumerate(params):
                     if p and i >= arguments:
