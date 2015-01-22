@@ -1468,7 +1468,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
                 triggerWordCompletions(view, lang, codeintel_word_completions)
 
             ##will queue an autocomplete job
-            autocomplete(view, 0 if is_fill_char else 200, 50 if is_fill_char else 600, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":"on_modified"})
+            autocomplete(view, 0 if is_fill_char else 20, 50 if is_fill_char else 60, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":"on_modified"})
         else:
             view.run_command('hide_auto_complete')
 
