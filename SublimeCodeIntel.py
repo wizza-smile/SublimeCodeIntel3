@@ -1464,7 +1464,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
 
             #fast trigger word completions from buffer
             codeintel_word_completions = settings_manager.get("codeintel_word_completions", language=lang)
-            if codeintel_word_completions in ["buffer", "all"]:
+            if not is_fill_char and codeintel_word_completions in ["buffer", "all"]:
                 triggerWordCompletions(view, lang, codeintel_word_completions)
 
             ##will queue an autocomplete job
