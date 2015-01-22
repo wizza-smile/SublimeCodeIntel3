@@ -292,7 +292,7 @@ def tooltip(view, calltips, text_in_current_line, original_pos, lang):
                 pos = sel.end()
                 if not pos or pos != original_pos:
                     return
-                view.run_command('insert_snippet', {'contents': snippets[0][0]})
+                view.run_command('insert_snippet', {'contents': snippets[0][1]})
             sublime.set_timeout(_insert_snippet, 500)  # Delay snippet insertion a bit... it's annoying some times
 
 
