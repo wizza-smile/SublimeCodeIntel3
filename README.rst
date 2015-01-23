@@ -162,9 +162,11 @@ To force re-indexation of the code intelligence database you need to follow thes
 
 What's New
 ----------
-v3.0.3:
+v3.0.4:
 
-+ never show completions, if not at least one character has been typed
++ super fast completions while typing
+
+v3.0.3:
 
 + now offering fast triggered word-completions, that will be shown, until codeIntel-machine completions arrive
 
