@@ -945,61 +945,64 @@ def codeintel(view, path, content, lang, pos, forms, callback=None, timeout=7000
         calltips = None
         defns = None
 
+
         if not buf:
             logger(view, 'warning', "`%s' (%s) is not a language that uses CIX" % (path, lang))
             return [None] * len(forms)
 
-        try:
-            trg = getattr(buf, 'preceding_trg_from_pos', lambda p: None)(pos2bytes(content, pos), pos2bytes(content, pos))
-            defn_trg = getattr(buf, 'defn_trg_from_pos', lambda p: None)(pos2bytes(content, pos))
-        except (CodeIntelError):
-            codeintel_log.exception("Exception! %s:%s (%s)" % (path or '<Unsaved>', pos, lang))
-            logger(view, 'info', "Error indexing! Please send the log file: '%s" % condeintel_log_filename)
-            trg = None
-            defn_trg = None
-        except:
-            codeintel_log.exception("Exception! %s:%s (%s)" % (path or '<Unsaved>', pos, lang))
-            logger(view, 'info', "Error indexing! Please send the log file: '%s" % condeintel_log_filename)
-            raise
-        else:
-            eval_log_stream = StringIO()
-            _hdlrs = codeintel_log.handlers
-            hdlr = logging.StreamHandler(eval_log_stream)
-            hdlr.setFormatter(logging.Formatter("%(name)s: %(levelname)s: %(message)s"))
-            codeintel_log.handlers = list(_hdlrs) + [hdlr]
-            ctlr = LogEvalController(codeintel_log)
+        def get_trg(type, *args):
             try:
-                if 'cplns' in forms and trg and trg.form == TRG_FORM_CPLN:
-                    cplns = buf.cplns_from_trg(trg, ctlr=ctlr, timeout=20)
-                if 'calltips' in forms and trg and trg.form == TRG_FORM_CALLTIP:
-                    calltips = buf.calltips_from_trg(trg, ctlr=ctlr, timeout=20)
-                if 'defns' in forms and defn_trg and defn_trg.form == TRG_FORM_DEFN:
-                    defns = buf.defns_from_trg(defn_trg, ctlr=ctlr, timeout=20)
-            except EvalTimeout:
-                logger(view, 'info', "Timeout while resolving completions!")
-            finally:
-                codeintel_log.handlers = _hdlrs
-            logger(view, 'warning', "")
-            logger(view, 'event', "")
-            result = False
-            merge = ''
-            for msg in reversed(eval_log_stream.getvalue().strip().split('\n')):
-                msg = msg.strip()
-                if msg:
-                    try:
-                        name, levelname, msg = msg.split(':', 2)
-                        name = name.strip()
-                        levelname = levelname.strip().lower()
-                        msg = msg.strip()
-                    except:
-                        merge = (msg + ' ' + merge) if merge else msg
-                        continue
-                    merge = ''
-                    if not result and msg.startswith('evaluating '):
-                        set_status(view, 'warning', msg)
-                        result = True
+                trg = getattr(buf, type, lambda *a: None)(*args)
+            except CodeIntelError:
+                codeintel_log.exception("Exception! %s:%s (%s)" % (path or '<Unsaved>', pos, lang))
+                logger(view, 'info', "Error indexing! Please send the log file: '%s" % condeintel_log_filename)
+                trg = None
+            except:
+                codeintel_log.exception("Exception! %s:%s (%s)" % (path or '<Unsaved>', pos, lang))
+                logger(view, 'info', "Error indexing! Please send the log file: '%s" % condeintel_log_filename)
+                raise
+            return trg
 
+        bpos = pos2bytes(content, pos)
+        trg = get_trg('preceding_trg_from_pos', bpos, bpos)
+        defn_trg = get_trg('defn_trg_from_pos', bpos) if 'defns' in forms else None
 
+        eval_log_stream = StringIO()
+        _hdlrs = codeintel_log.handlers
+        hdlr = logging.StreamHandler(eval_log_stream)
+        hdlr.setFormatter(logging.Formatter("%(name)s: %(levelname)s: %(message)s"))
+        codeintel_log.handlers = list(_hdlrs) + [hdlr]
+        ctlr = LogEvalController(codeintel_log)
+        try:
+            if 'cplns' in forms and trg and trg.form == TRG_FORM_CPLN:
+                cplns = buf.cplns_from_trg(trg, ctlr=ctlr, timeout=20)
+            if 'calltips' in forms and trg and trg.form == TRG_FORM_CALLTIP:
+                calltips = buf.calltips_from_trg(trg, ctlr=ctlr, timeout=20)
+            if 'defns' in forms and defn_trg and defn_trg.form == TRG_FORM_DEFN:
+                defns = buf.defns_from_trg(defn_trg, ctlr=ctlr, timeout=20)
+        except EvalTimeout:
+            logger(view, 'info', "Timeout while resolving completions!")
+        finally:
+            codeintel_log.handlers = _hdlrs
+        logger(view, 'warning', "")
+        logger(view, 'event', "")
+        result = False
+        merge = ''
+        for msg in reversed(eval_log_stream.getvalue().strip().split('\n')):
+            msg = msg.strip()
+            if msg:
+                try:
+                    name, levelname, msg = msg.split(':', 2)
+                    name = name.strip()
+                    levelname = levelname.strip().lower()
+                    msg = msg.strip()
+                except:
+                    merge = (msg + ' ' + merge) if merge else msg
+                    continue
+                merge = ''
+                if not result and msg.startswith('evaluating '):
+                    set_status(view, 'warning', msg)
+                    result = True
 
         ##collect citdl_expr from this run
         citdl_expr = buf.last_citdl_expr
