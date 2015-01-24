@@ -191,7 +191,7 @@ def tooltip_popup(view, snippets):
     vid = view.id()
 
     on_query_info = {}
-    on_query_info["params"] = ("tooltips", "none", "", None, None, False)
+    on_query_info["params"] = ("tooltips", "none", "", None, None)
     on_query_info["cplns"] = snippets
 
     completions[vid] = on_query_info
@@ -206,7 +206,18 @@ def tooltip_popup(view, snippets):
 
     sublime.set_timeout(open_auto_complete, 0)
 
-def tooltip(view, calltips, text_in_current_line, original_pos, lang):
+def tooltip(view, calltips, text_in_current_line, original_pos, lang, caller):
+    def _insert_snippet():
+        # Check to see we are still at a position where the snippet is wanted:
+        view_sel = view.sel()
+        if not view_sel:
+            return
+        sel = view_sel[0]
+        pos = sel.end()
+        if not pos or pos != original_pos:
+            return
+        view.run_command('insert_snippet', {'contents': snippets[0][1]})
+
     codeintel_snippets = settings_manager.get('codeintel_snippets', default=True, language=lang)
     codeintel_tooltips = settings_manager.get('codeintel_tooltips', default='popup', language=lang)
 
@@ -542,7 +553,7 @@ def autocomplete(view, timeout, busy_timeout, forms, preemptive=False, args=[], 
 
                 #if cplns is not None:
                 on_query_info = {}
-                on_query_info["params"] = ("cplns", add_word_completions, text_in_current_line, lang, trigger, False)
+                on_query_info["params"] = ("cplns", add_word_completions, text_in_current_line, lang, trigger)
                 on_query_info["cplns"] = cplns
 
                 completions[vid] = on_query_info
@@ -1098,26 +1109,6 @@ def get_revision(path=None):
             break
     return u'GIT-unknown'
 
-def triggerWordCompletions(view, lang, codeintel_word_completions):
-    global last_trigger_name, last_citdl_expr
-    #fast triggering
-    vid = view.id()
-
-    on_query_info = {}
-    on_query_info["params"] = ("cplns", codeintel_word_completions, "", None, None, True)
-    on_query_info["cplns"] = None
-
-    completions[vid] = on_query_info
-    last_citdl_expr = None
-    last_trigger_name = None
-
-    view.run_command('auto_complete', {
-        'disable_auto_insert': True,
-        'api_completions_only': False,
-        'next_completion_if_showing': False,
-        'auto_complete_commit_on_tab': True,
-    })
-
 
 #thanks to https://github.com/alienhard
 #and his SublimeAllAutocomplete
@@ -1440,16 +1431,10 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         pos = sel.end()
         text = view.substr(sublime.Region(pos - 1, pos))
 
-
-        #no autocomplete if last char is empty string
-        #hide completions if visible
-        #this totally necessary, if you like to use your tab-key extensively
+        #cancel on cpln_stop_chars per language
         if text and text in cpln_stop_chars[lang]:
-            #hey k, clean up later, issues are coming from ST2 mostly!
             view.run_command('hide_auto_complete')
             return
-
-        is_fill_char = (text and text[-1] in cpln_fillup_chars.get(lang, ''))
 
         # print('on_modified', view.command_history(1), view.command_history(0), view.command_history(-1))
         if (not hasattr(view, 'command_history') or view.command_history(1)[1] is None and (
@@ -1461,15 +1446,26 @@ class PythonCodeIntel(sublime_plugin.EventListener):
                     view.command_history(0)[0] == 'insert_snippet' and view.command_history(0)[1]['contents'] == '($0)'
                 )
         )):
-            if view.command_history(0)[0] == 'commit_completion':
-                forms = ('calltips',)
-            else:
-                forms = ('calltips', 'cplns')
 
-            #fast trigger word completions from buffer
-            codeintel_word_completions = settings_manager.get("codeintel_word_completions", language=lang)
-            if not is_fill_char and codeintel_word_completions in ["buffer", "all"]:
-                triggerWordCompletions(view, lang, codeintel_word_completions)
+            forms = ('cplns',)
+            caller = "on_modified"
+            if settings_manager.get('codeintel_snippets', default=True, language=lang):
+                try:
+                    if view.command_history(0)[1]['characters'][-1] == '\t':
+                        line = view.line(sublime.Region(pos - 1, pos))
+                        backLine = sublime.Region(line.a, pos)
+                        strippedLine = view.substr(backLine).rstrip()
+                        last_char = strippedLine[-1:]
+                        if last_char and last_char in "(,":
+                            strippedLine = strippedLine if last_char == "(" else strippedLine+" "
+                            view.run_command('replace_tab', {"strippedLine":strippedLine, "line_from":backLine.a, "line_to":backLine.b})
+                            forms = ('calltips',)
+                            caller = "instant_snippet"
+                            pos = view.sel()[0].end()
+                except:
+                    pass
+
+            is_fill_char = (text and text[-1] in cpln_fillup_chars.get(lang, ''))
 
             ##will queue an autocomplete job
             autocomplete(view, 0 if is_fill_char else 20, 50 if is_fill_char else 60, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":"on_modified"})
@@ -1508,16 +1504,17 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         sublime_word_completions = False
         sublime_explicit_completions = False
 
+        word_completions = 0 if sublime_word_completions and len(prefix) != 0 else sublime.INHIBIT_WORD_COMPLETIONS;
+        explicit_completions = 0 if sublime_explicit_completions else sublime.INHIBIT_EXPLICIT_COMPLETIONS;
+
         _completions = []
         if vid in completions:
 
             on_query_info = completions[vid]
-            completion_type, add_word_completions, text_in_current_line, lang, trigger, sublime_explicit_completions = on_query_info["params"]
+            completion_type, add_word_completions, text_in_current_line, lang, trigger = on_query_info["params"]
             cplns = on_query_info["cplns"]
             del completions[vid]
 
-            word_completions = 0 if sublime_word_completions and len(prefix) != 0 else sublime.INHIBIT_WORD_COMPLETIONS;
-            explicit_completions = 0 if sublime_explicit_completions else sublime.INHIBIT_EXPLICIT_COMPLETIONS;
 
             if completion_type == "tooltips":
                 return (cplns, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
