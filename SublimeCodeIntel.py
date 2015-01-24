@@ -821,65 +821,7 @@ def codeintel_scan(view, path, content, lang, callback=None, pos=None, forms=Non
                 raise KeyError
         except KeyError:
             #generate new Environment
-
-            valid = True
-            if not mgr.is_citadel_lang(lang) and not mgr.is_cpln_lang(lang):
-                if lang in ('Console', 'Plain text'):
-                    msg = "Invalid language: %s. Available: %s" % (lang, ', '.join(set(mgr.get_citadel_langs() + mgr.get_cpln_langs())))
-                    log.debug(msg)
-                    codeintel_log.warning(msg)
-                valid = False
-
-
-            ##load settings for this language
-            config = settings_manager.getSettings(lang)
-
-            codeintel_selected_catalogs = config.get('codeintel_selected_catalogs')
-
-            avail_catalogs = mgr.db.get_catalogs_zone().avail_catalogs()
-
-            # Load configuration files:
-            all_catalogs = []
-            for catalog in avail_catalogs:
-                all_catalogs.append("%s (for %s: %s)" % (catalog['name'], catalog['lang'], catalog['description']))
-                if catalog['lang'] == lang:
-                    if catalog['name'] in codeintel_selected_catalogs:
-                        catalogs.append(catalog['name'])
-            msg = "Avaliable catalogs: %s" % ', '.join(all_catalogs) or None
-            log.debug(msg)
-            codeintel_log.debug(msg)
-
-            ## scan_extra_dir
-            if config.get('codeintel_scan_files_in_project', True):
-                scan_extra_dir = list(folders)
-            else:
-                scan_extra_dir = []
-
-            scan_extra_dir.extend(config.get("codeintel_scan_extra_dir", []))
-            config["codeintel_scan_extra_dir"] = scan_extra_dir
-
-            for conf, p in config.items():
-                if isinstance(p, str) and p.startswith('~'):
-                    config[conf] = os.path.expanduser(p)
-
-            # Setup environment variables
-            # lang env settings
-            env = config.get('env', {})
-            #basis is os environment
-            _environ = dict(os.environ)
-            for k, v in env.items():
-                _old = None
-                while '$' in v and v != _old:
-                    _old = v
-                    v = os.path.expandvars(v)
-                _environ[k] = v
-            config['env'] = _environ
-
-            env = SimplePrefsEnvironment(**config)
-            env._valid = valid
-            env._mtime = settings_manager._settings_id
-            env._lang = lang
-            env._folders = folders
+            env = generateEnvironment(mgr, lang, folders)
             _ci_envs_[vid] = env
         #env._time = now + 5  # don't check again in less than five seconds
 
@@ -1042,7 +984,68 @@ def codeintel(view, path, content, lang, pos, forms, callback=None, timeout=7000
     codeintel_scan(view, path, content, lang, _codeintel, pos, forms, caller=caller)
 
 
+def generateEnvironment(mgr, lang, folders):
+    catalogs = []
+    valid = True
+    if not mgr.is_citadel_lang(lang) and not mgr.is_cpln_lang(lang):
+        if lang in ('Console', 'Plain text'):
+            msg = "Invalid language: %s. Available: %s" % (lang, ', '.join(set(mgr.get_citadel_langs() + mgr.get_cpln_langs())))
+            log.debug(msg)
+            codeintel_log.warning(msg)
+        valid = False
 
+
+    ##load settings for this language
+    config = settings_manager.getSettings(lang)
+
+    codeintel_selected_catalogs = config.get('codeintel_selected_catalogs')
+
+    avail_catalogs = mgr.db.get_catalogs_zone().avail_catalogs()
+
+    # Load configuration files:
+    all_catalogs = []
+    for catalog in avail_catalogs:
+        all_catalogs.append("%s (for %s: %s)" % (catalog['name'], catalog['lang'], catalog['description']))
+        if catalog['lang'] == lang:
+            if catalog['name'] in codeintel_selected_catalogs:
+                catalogs.append(catalog['name'])
+    msg = "Avaliable catalogs: %s" % ', '.join(all_catalogs) or None
+    log.debug(msg)
+    codeintel_log.debug(msg)
+
+    ## scan_extra_dir
+    if config.get('codeintel_scan_files_in_project', True):
+        scan_extra_dir = list(folders)
+    else:
+        scan_extra_dir = []
+
+    scan_extra_dir.extend(config.get("codeintel_scan_extra_dir", []))
+    config["codeintel_scan_extra_dir"] = scan_extra_dir
+
+    for conf, p in config.items():
+        if isinstance(p, str) and p.startswith('~'):
+            config[conf] = os.path.expanduser(p)
+
+    # Setup environment variables
+    # lang env settings
+    env = config.get('env', {})
+    #basis is os environment
+    _environ = dict(os.environ)
+    for k, v in env.items():
+        _old = None
+        while '$' in v and v != _old:
+            _old = v
+            v = os.path.expandvars(v)
+        _environ[k] = v
+    config['env'] = _environ
+
+    env = SimplePrefsEnvironment(**config)
+    env._valid = valid
+    env._mtime = settings_manager._settings_id
+    env._lang = lang
+    env._folders = folders
+
+    return env
 
 def find_back(start_at, look_for):
     root = os.path.realpath('/')
@@ -1232,10 +1235,12 @@ class SettingsManager():
         self.user_settings_file = None
         self.sublime_settings_file = None
         self.sublime_auto_complete = None
+        self.sublime_auto_complete_delay = None
 
     def loadSublimeSettings(self):
         self.sublime_settings_file = sublime.load_settings('Preferences.sublime-settings')
         self.sublime_auto_complete = self.sublime_settings_file.get('auto_complete')
+        self.sublime_auto_complete_delay = self.sublime_settings_file.get('auto_complete_delay')
 
     def get(self, config_key, default=None, language=None):
         if language is not None:
@@ -1306,7 +1311,7 @@ class SettingsManager():
         if self.needsUpdate():
             self.needs_update = False
             self._settings = self.load_relevant_settings()
-            self.updateSettingsOnViews()
+            #self.updateSettingsOnViews()
             self.generateSettingsId()
             self.updateLanguageSpecificSettings()
 
@@ -1330,17 +1335,17 @@ class SettingsManager():
         self.user_settings_file.clear_on_change(self.SETTINGS_FILE_NAME)
         self.user_settings_file.add_on_change(self.SETTINGS_FILE_NAME, self.settings_changed)
 
-    #DEPRECATED
-    def updateSettingsOnViews(self):
-        for window in sublime.windows():
-            for view in window.views():
-                view_settings = view.settings()
-                for setting_name in self.ALL_SETTINGS:
-                    if setting_name in self._settings:
-                        view_settings.set(setting_name, self._settings[setting_name])
+    ##DEPRECATED
+    #def updateSettingsOnViews(self):
+    #    for window in sublime.windows():
+    #        for view in window.views():
+    #            view_settings = view.settings()
+    #            for setting_name in self.ALL_SETTINGS:
+    #                if setting_name in self._settings:
+    #                    view_settings.set(setting_name, self._settings[setting_name])
 
-                if view_settings.get('codeintel') is None:
-                    view_settings.set('codeintel', True)
+    #            if view_settings.get('codeintel') is None:
+    #                view_settings.set('codeintel', True)
 
 settings_manager = SettingsManager()
 
@@ -1377,16 +1382,21 @@ class PythonCodeIntel(sublime_plugin.EventListener):
     def on_pre_save(self, view):
         if view.is_dirty():
             try:
+                lang = guess_lang(view)
+                if not lang or lang.lower() not in [l.lower() for l in settings_manager.get('codeintel_enabled_languages', [])]:
+                    return
+                mgr = codeintel_manager()
                 env = _ci_envs_[view.id()]
             except KeyError:
-                return
+                mgr = codeintel_manager()
+                folders = getattr(view.window(), 'folders', lambda: [])()
+                env = generateEnvironment(mgr, lang, folders)
 
-            lang = guess_lang(view)
             path = view.file_name()
-            mtime = os.stat(path)[stat.ST_MTIME]
+            mtime = None
 
             content = view.substr(sublime.Region(0, view.size()))
-            mgr = codeintel_manager()
+
             buf = mgr.buf_from_content(content, lang, env, path or "<Unsaved>", 'utf-8')
             buf.scan(mtime=mtime, skip_scan_time_check=True)
 
@@ -1471,7 +1481,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
             is_fill_char = (text and text[-1] in cpln_fillup_chars.get(lang, ''))
 
             ##will queue an autocomplete job
-            autocomplete(view, 0 if is_fill_char else 20, 50 if is_fill_char else 60, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":"on_modified"})
+            autocomplete(view, 0, settings_manager.sublime_auto_complete_delay, forms, is_fill_char, args=[path, pos, lang], kwargs={"caller":caller})
         else:
             view.run_command('hide_auto_complete')
 
