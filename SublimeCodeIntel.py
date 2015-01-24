@@ -138,9 +138,10 @@ for logger in ('citadel', 'css', 'django', 'html', 'html5', 'javascript', 'mason
 #no live completions for these
 cpln_stop_chars = {
     'CSS': " ('\";{},.>/",
+    'HTML': "",
     'JavaScript': "~`!@#%^&*()-=+{}[]|\\;:'\",<>?/ ",
     'Perl': "-~`!@#$%^&*()=+{}[]|\\;:'\",.<>?/ ",
-    'PHP': "~`@%^&*()=+{}]|;'\",.<?/",
+    'PHP': "~`@%^&*()=+{}]|;'\",.<?/ ",
     'Python': "~`!@#$%^&*()-=+{}[]|\\;:'\",<>?/",
     'Python3': "~`!@#$%^&*()-=+{}[]|\\;:'\",<>?/",
     'Ruby': "~`@#$%^&*(+}[]|\\;:,<>/ '\"."
@@ -149,6 +150,7 @@ cpln_stop_chars = {
 #don't fast-trigger word completions on these
 cpln_fillup_chars = {
     'CSS': " '\";},/",
+    'HTML': "",
     'JavaScript': "~`!#%^&*()-=+{}[]|\\;:'\",.<>?/",
     'Perl': "~`!@#$%^&*(=+}[]|\\;'\",.<>?/ ",
     'PHP': "$~`%^&*()-+{}[]|;:'\\\",.<> ",
@@ -1063,27 +1065,10 @@ def find_back(start_at, look_for):
         start_at = continue_at
 
 
-def updateCodeIntelDict(master, partial):
-    for key, value in partial.items():
-        if isinstance(value, dict):
-            master.setdefault(key, {}).update(value)
-        elif isinstance(value, (list, tuple)):
-            master.setdefault(key, []).extend(value)
 
 
-def tryReadDict(filename, dictToUpdate):
-    if filename:
-        file = open(filename, 'r')
-        try:
-            updateCodeIntelDict(dictToUpdate, eval(file.read()))
-        finally:
-            file.close()
 
 
-def tryGetMTime(filename):
-    if filename:
-        return os.stat(filename)[stat.ST_MTIME]
-    return 0
 
 
 def _get_git_revision(path):
