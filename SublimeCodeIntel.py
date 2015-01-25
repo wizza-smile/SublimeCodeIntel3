@@ -138,10 +138,9 @@ for logger in ('citadel', 'css', 'django', 'html', 'html5', 'javascript', 'mason
 #no live completions for these
 cpln_stop_chars = {
     'CSS': " ('\";{},.>/",
-    'HTML': "",
     'JavaScript': "~`!@#%^&*()-=+{}[]|\\;:'\",<>?/ ",
     'Perl': "-~`!@#$%^&*()=+{}[]|\\;:'\",.<>?/ ",
-    'PHP': "~`@%^&*()=+{}]|;'\",.<?/ ",
+    'PHP': "~`@%^&*()=+{}]|;'\",.<?/",
     'Python': "~`!@#$%^&*()-=+{}[]|\\;:'\",<>?/",
     'Python3': "~`!@#$%^&*()-=+{}[]|\\;:'\",<>?/",
     'Ruby': "~`@#$%^&*(+}[]|\\;:,<>/ '\"."
@@ -150,7 +149,6 @@ cpln_stop_chars = {
 #don't fast-trigger word completions on these
 cpln_fillup_chars = {
     'CSS': " '\";},/",
-    'HTML': "",
     'JavaScript': "~`!#%^&*()-=+{}[]|\\;:'\",.<>?/",
     'Perl': "~`!@#$%^&*(=+}[]|\\;'\",.<>?/ ",
     'PHP': "$~`%^&*()-+{}[]|;:'\\\",.<> ",
@@ -1181,7 +1179,9 @@ class WordCompletionsFromBuffer():
     def is_empty_match(self, match):
         return match.empty()
 
-
+#make sure all settings could be loaded and sublime is ready
+def codeintel_enabled(default=False):
+    return settings_manager.sublime_auto_complete is not None
 
 
 class SettingsManager():
@@ -1296,7 +1296,6 @@ class SettingsManager():
         if self.needsUpdate():
             self.needs_update = False
             self._settings = self.load_relevant_settings()
-            #self.updateSettingsOnViews()
             self.generateSettingsId()
             self.updateLanguageSpecificSettings()
 
@@ -1320,28 +1319,7 @@ class SettingsManager():
         self.user_settings_file.clear_on_change(self.SETTINGS_FILE_NAME)
         self.user_settings_file.add_on_change(self.SETTINGS_FILE_NAME, self.settings_changed)
 
-    ##DEPRECATED
-    #def updateSettingsOnViews(self):
-    #    for window in sublime.windows():
-    #        for view in window.views():
-    #            view_settings = view.settings()
-    #            for setting_name in self.ALL_SETTINGS:
-    #                if setting_name in self._settings:
-    #                    view_settings.set(setting_name, self._settings[setting_name])
-
-    #            if view_settings.get('codeintel') is None:
-    #                view_settings.set('codeintel', True)
-
 settings_manager = SettingsManager()
-
-
-def codeintel_enabled(view, default=None):
-    return True
-    if view.settings().get('codeintel') is None:
-        ##updates settings if necessary
-        if settings_manager.getSettings():
-            return True
-    return settings_manager.get('codeintel', default=default)
 
 
 def format_completions_by_language(cplns, language, text_in_current_line, trigger):
@@ -1397,7 +1375,7 @@ class PythonCodeIntel(sublime_plugin.EventListener):
         view_sel = view.sel()
         settings_manager.update()
 
-        if not view_sel or settings_manager.sublime_auto_complete is None:
+        if not codeintel_enabled() or not view_sel:
             return
 
         sublime_scope = getSublimeScope(view)
@@ -1545,7 +1523,9 @@ class CodeIntelAutoComplete(sublime_plugin.TextCommand):
     def run(self, edit, block=False):
         view = self.view
         view_sel = view.sel()
-        if not view_sel:
+        settings_manager.update()
+
+        if not codeintel_enabled() or not view_sel:
             return
         sel = view_sel[0]
         pos = sel.end()
@@ -1618,153 +1598,41 @@ class BackToPythonDefinition(sublime_plugin.TextCommand):
 
 
 
-
-
-
-
-
-
-class CodeintelCommand(sublime_plugin.TextCommand):
-    """command to interact with codeintel"""
-
-    def __init__(self, view):
-        self.view = view
-        self.help_called = False
-
-    def run_(self, action):
-        """method called by default via view.run_command;
-           used to dispatch to appropriate method"""
-        if not action:
+class SublimecodeintelDumpImportDirs(sublime_plugin.WindowCommand):
+    def run(self):
+        settings_manager.update()
+        if not codeintel_enabled():
             return
 
-        try:
-            lc_action = action.lower()
-        except AttributeError:
-            return
-        if lc_action == 'reset':
-            self.reset()
-        elif lc_action == 'enable':
-            self.enable(True)
-        elif lc_action == 'disable':
-            self.enable(False)
-        elif lc_action == 'on':
-            self.on_off(True)
-        elif lc_action == 'off':
-            self.on_off(False)
-        elif lc_action == 'lang-on':
-            self.on_off(True, guess_lang(self.view, self.view.file_name()))
-        elif lc_action == 'lang-off':
-            self.on_off(False, guess_lang(self.view, self.view.file_name()))
+        codeintel_database_dir = os.path.expanduser(settings_manager.get("codeintel_database_dir"))
+        db_dir = os.path.join(codeintel_database_dir, "db")
 
-    def reset(self):
-        """Restores user settings."""
-        settings_manager.getSettings()
-        logger(self.view, 'info', "SublimeCodeIntel Reseted!")
+        stat_dir = os.path.join(codeintel_database_dir, "import_dir_stats")
+        if not os.path.exists(stat_dir):
+            os.makedirs(stat_dir)
 
-    def enable(self, enable):
-        self.view.settings().set('codeintel', enable)
-        logger(self.view, 'info', "SublimeCodeIntel %s" % ("Enabled!" if enable else "Disabled",))
+        def get_immediate_subdirectories(a_dir):
+            for subdirname in os.listdir(a_dir):
+                dirname = os.path.join(a_dir, subdirname)
+                if os.path.isdir(dirname):
+                    yield (dirname, subdirname)
 
-    def on_off(self, enable, lang=None):
-        """Turns live autocomplete on or off."""
-        if lang:
-            _codeintel_live_enabled_languages = self.view.settings().get('codeintel_live_enabled_languages', [])
-            if lang.lower() in [l.lower() for l in _codeintel_live_enabled_languages]:
-                if not enable:
-                    _codeintel_live_enabled_languages = [l for l in _codeintel_live_enabled_languages if l.lower() != lang.lower()]
-                    self.view.settings().set('codeintel_live_enabled_languages', _codeintel_live_enabled_languages)
-                    logger(self.view, 'info', "SublimeCodeIntel Live Autocompletion for %s %s" % (lang, "Enabled!" if enable else "Disabled"))
-            else:
-                if enable:
-                    _codeintel_live_enabled_languages.append(lang)
-                    self.view.settings().set('codeintel_live_enabled_languages', _codeintel_live_enabled_languages)
-                    logger(self.view, 'info', "SublimeCodeIntel Live Autocompletion for %s %s" % (lang, "Enabled!" if enable else "Disabled"))
-        else:
-            self.view.settings().set('codeintel_live', enable)
-            logger(self.view, 'info', "SublimeCodeIntel Live Autocompletion %s" % ("Enabled!" if enable else "Disabled",))
-            # logger(view, 'info', "skip `%s': disabled language" % lang)
+        for lib_dir in [lib_dir for lib_dir in get_immediate_subdirectories(db_dir)]:
+            if lib_dir[1] != "stdlibs":
+                lang = lib_dir[1]
+                import_dirs = []
+                hash_map = {}
+                for lib_dir_entry in get_immediate_subdirectories(lib_dir[0]):
+                    try:
+                        pathfile_path = os.path.join(lib_dir_entry[0], "path")
+                        path_file = open(pathfile_path)
+                        import_dir = path_file.read()
+                        import_dirs.append(import_dir)
+                        hash_map[import_dir] = lib_dir_entry[1]
+                    except:
+                        pass
 
+                stat_file = open(os.path.join(stat_dir, lang), "w")
+                for item in sorted(import_dirs, key=str.lower):
+                    stat_file.write("%s %s\n" % (hash_map[item], item) )
 
-
-
-
-class SublimecodeintelWindowCommand(sublime_plugin.WindowCommand):
-    def is_enabled(self):
-        view = self.window.active_view()
-        return bool(view)
-
-    def run_(self, args):
-        pass
-
-
-class SublimecodeintelCommand(SublimecodeintelWindowCommand):
-    def is_enabled(self, active=None):
-
-        enabled = super(SublimecodeintelCommand, self).is_enabled()
-
-
-        if active is not None:
-            view = self.window.active_view()
-            enabled = enabled and codeintel_enabled(view, True) == active
-
-            print("WINDOW COMMAND ENABLED "+str(enabled))
-        return bool(enabled)
-
-    def run_(self, args={}):
-        view = self.window.active_view()
-        action = args.get('action', '')
-
-        if view and action:
-            view.run_command('codeintel', action)
-
-
-class SublimecodeintelEnableCommand(SublimecodeintelCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelEnableCommand, self).is_enabled(False)
-
-
-class SublimecodeintelDisableCommand(SublimecodeintelCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelDisableCommand, self).is_enabled(True)
-
-
-class SublimecodeintelResetCommand(SublimecodeintelCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelResetCommand, self).is_enabled()
-
-
-class SublimecodeintelLiveCommand(SublimecodeintelCommand):
-    def is_enabled(self, active=True, onlylang=False):
-        enabled = super(SublimecodeintelLiveCommand, self).is_enabled(True)
-
-        if active is not None:
-            view = self.window.active_view()
-
-            if onlylang:
-                enabled = enabled and view.settings().get('codeintel_live', True) is True
-                lang = guess_lang(view)
-                enabled = enabled and lang and (lang.lower() in [l.lower() for l in view.settings().get('codeintel_live_enabled_languages', [])]) == active
-            else:
-                enabled = enabled and view.settings().get('codeintel_live', True) == active
-
-        return bool(enabled)
-
-
-class SublimecodeintelEnableLiveCommand(SublimecodeintelLiveCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelEnableLiveCommand, self).is_enabled(False, False)
-
-
-class SublimecodeintelDisableLiveCommand(SublimecodeintelLiveCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelDisableLiveCommand, self).is_enabled(True, False)
-
-
-class SublimecodeintelEnableLiveLangCommand(SublimecodeintelLiveCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelEnableLiveLangCommand, self).is_enabled(False, True)
-
-
-class SublimecodeintelDisableLiveLangCommand(SublimecodeintelLiveCommand):
-    def is_enabled(self):
-        return super(SublimecodeintelDisableLiveLangCommand, self).is_enabled(True, True)
