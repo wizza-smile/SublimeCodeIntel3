@@ -497,7 +497,7 @@ def autocomplete(view, timeout, busy_timeout, forms, preemptive=False, args=[], 
         if not next_char or (next_char != '_' and not next_char.isalnum()):
             vid = view.id()
 
-            def _trigger(trigger, citdl_expr, calltips, cplns=None):
+            def _trigger(trigger, citdl_expr, calltips=None, cplns=None):
                 global cplns_were_empty, last_trigger_name, last_citdl_expr, cpln_stop_chars
 
                 add_word_completions = settings_manager.get("codeintel_word_completions", language=lang)
