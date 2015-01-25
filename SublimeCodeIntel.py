@@ -508,7 +508,7 @@ def autocomplete(view, timeout, busy_timeout, forms, preemptive=False, args=[], 
                 if calltips and caller != "on_modified":
                     if trigger:
                         print("current triggername: %r" % trigger.name)
-                    tooltip(view, calltips, text_in_current_line, original_pos, lang)
+                    tooltip(view, calltips, text_in_current_line, original_pos, lang, caller)
                     return
 
                 #under certain circumstances we have to close before reopening the currently open completions-panel
