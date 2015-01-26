@@ -1199,6 +1199,7 @@ class SettingsManager():
     #these settings can be overriden "per language"
     OVERRIDE_SETTINGS = [
         'codeintel_exclude_scopes_from_complete_triggers',
+        'codeintel_framework_compat_mode',
         'codeintel_language_settings',
         'codeintel_live',
         'codeintel_max_recursive_dir_depth',
